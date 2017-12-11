@@ -299,7 +299,7 @@ public abstract class HystrixCommand<R> extends AbstractCommand<R> implements Hy
             @Override
             public Observable<R> call() {
                 try {
-                    return Observable.just(run());
+                    return Observable.just(run()); // 调用 run() 方法，运行正常执行逻辑
                 } catch (Throwable ex) {
                     return Observable.error(ex);
                 }
@@ -308,6 +308,8 @@ public abstract class HystrixCommand<R> extends AbstractCommand<R> implements Hy
             @Override
             public void call() {
                 // Save thread on which we get subscribed so that we can interrupt it later if needed
+                // 记录 执行线程
+                // executionThread 用于 HystrixCommand#queue() 方法，返回的 Future 结果，可以调用 Future#cancel(Boolean) 方法
                 executionThread.set(Thread.currentThread());
             }
         });
