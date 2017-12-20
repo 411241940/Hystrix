@@ -98,7 +98,7 @@ public abstract class HystrixConcurrencyStrategy {
         final int dynamicCoreSize = threadPoolProperties.coreSize().get();
         final int keepAliveTime = threadPoolProperties.keepAliveTimeMinutes().get();
         final int maxQueueSize = threadPoolProperties.maxQueueSize().get();
-        final BlockingQueue<Runnable> workQueue = getBlockingQueue(maxQueueSize);
+        final BlockingQueue<Runnable> workQueue = getBlockingQueue(maxQueueSize); // 获得线程池的阻塞队列
 
         if (allowMaximumSizeToDivergeFromCoreSize) {
             final int dynamicMaximumSize = threadPoolProperties.maximumSize().get();
@@ -156,9 +156,11 @@ public abstract class HystrixConcurrencyStrategy {
          * Queuing results in added latency and would only occur when the thread-pool is full at which point there are latency issues
          * and rejecting is the preferred solution.
          */
+        // 当 maxQueueSize <= 0 时( 默认值 ：-1 ) 时，使用 SynchronousQueue 。超过线程池的 maximumPoolSize 时，提交任务被拒绝。
         if (maxQueueSize <= 0) {
             return new SynchronousQueue<Runnable>();
         } else {
+            // 超过线程池的 maximumPoolSize 时，提交任务被阻塞等待。超过线程池的 maximumPoolSize + 线程池队列的 maxQueueSize 时，任务被拒绝。
             return new LinkedBlockingQueue<Runnable>(maxQueueSize);
         }
     }

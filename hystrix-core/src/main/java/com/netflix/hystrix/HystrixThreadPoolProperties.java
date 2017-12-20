@@ -58,11 +58,43 @@ public abstract class HystrixThreadPoolProperties {
     static int default_threadPoolRollingNumberStatisticalWindow = 10000; // milliseconds for rolling number
     static int default_threadPoolRollingNumberStatisticalWindowBuckets = 10; // number of buckets in rolling number (10 1-second buckets)
 
+    /**
+     * 线程池 corePoolSize
+     */
     private final HystrixProperty<Integer> corePoolSize;
+
+    /**
+     * 线程池 maximumPoolSize
+     */
     private final HystrixProperty<Integer> maximumPoolSize;
+
+    /**
+     * 线程池 线程空闲存储时长
+     */
     private final HystrixProperty<Integer> keepAliveTime;
+
+    /**
+     * 线程池等待队列长度，默认值:-1，-1表示不等待直接拒绝
+     *
+     * {@link HystrixConcurrencyStrategy#getBlockingQueue(int)}
+     */
     private final HystrixProperty<Integer> maxQueueSize;
+
+    /**
+     * 队列元素数量超过多少后，拒绝任务
+     *
+     * {@link HystrixThreadPool#isQueueSpaceAvailable()}
+     * 目的 ：线程池的队列大小不能【动态】调整，通过该变量控制队列元素【实际】上限
+     */
     private final HystrixProperty<Integer> queueSizeRejectionThreshold;
+
+    /**
+     * 是否允许 maximumPoolSize 不等于( 偏离 ) corePoolSize
+     *
+     * {@link #actualMaximumSize()}
+     *
+     * In JDK 6, setCorePoolSize and setMaximumPoolSize will execute a lock operation. Avoid them if the pool size is not changed.
+     */
     private final HystrixProperty<Boolean> allowMaximumSizeToDivergeFromCoreSize;
 
     private final HystrixProperty<Integer> threadPoolRollingNumberStatisticalWindowInMilliseconds;

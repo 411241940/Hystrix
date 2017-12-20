@@ -175,7 +175,7 @@ public class HystrixCommandMetrics extends HystrixMetrics {
     private final HystrixThreadPoolKey threadPoolKey;
     private final AtomicInteger concurrentExecutionCount = new AtomicInteger();
 
-    private HealthCountsStream healthCountsStream;
+    private HealthCountsStream healthCountsStream; // 统计任务失败率
     private final RollingCommandEventCounterStream rollingCommandEventCounterStream;
     private final CumulativeCommandEventCounterStream cumulativeCommandEventCounterStream;
     private final RollingCommandLatencyDistributionStream rollingCommandLatencyDistributionStream;
@@ -418,8 +418,8 @@ public class HystrixCommandMetrics extends HystrixMetrics {
         }
 
         public HealthCounts plus(long[] eventTypeCounts) {
-            long updatedTotalCount = totalCount;
-            long updatedErrorCount = errorCount;
+            long updatedTotalCount = totalCount; // 之前的请求总数
+            long updatedErrorCount = errorCount; // 之前的失败个数
 
             long successCount = eventTypeCounts[HystrixEventType.SUCCESS.ordinal()];
             long failureCount = eventTypeCounts[HystrixEventType.FAILURE.ordinal()];
@@ -427,7 +427,10 @@ public class HystrixCommandMetrics extends HystrixMetrics {
             long threadPoolRejectedCount = eventTypeCounts[HystrixEventType.THREAD_POOL_REJECTED.ordinal()];
             long semaphoreRejectedCount = eventTypeCounts[HystrixEventType.SEMAPHORE_REJECTED.ordinal()];
 
+            // 加上所有事件的总数
             updatedTotalCount += (successCount + failureCount + timeoutCount + threadPoolRejectedCount + semaphoreRejectedCount);
+
+            // 加上失败事件的总数（包括请求失败、超时、线程池满、信号量满）
             updatedErrorCount += (failureCount + timeoutCount + threadPoolRejectedCount + semaphoreRejectedCount);
             return new HealthCounts(updatedTotalCount, updatedErrorCount);
         }

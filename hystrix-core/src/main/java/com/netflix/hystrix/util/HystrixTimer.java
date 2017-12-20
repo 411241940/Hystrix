@@ -38,6 +38,9 @@ public class HystrixTimer {
 
     private static final Logger logger = LoggerFactory.getLogger(HystrixTimer.class);
 
+    /**
+     * 单例
+     */
     private static HystrixTimer INSTANCE = new HystrixTimer();
 
     private HystrixTimer() {
@@ -88,7 +91,7 @@ public class HystrixTimer {
      * @return reference to the TimerListener that allows cleanup via the <code>clear()</code> method
      */
     public Reference<TimerListener> addTimerListener(final TimerListener listener) {
-        startThreadIfNeeded();
+        startThreadIfNeeded(); // 保证 executor 延迟初始化已完成
         // add the listener
 
         Runnable r = new Runnable() {
@@ -103,10 +106,14 @@ public class HystrixTimer {
             }
         };
 
+        // 提交定时监听器，生成定时任务 f ( ScheduledFuture )
         ScheduledFuture<?> f = executor.get().getThreadPool().scheduleAtFixedRate(r, listener.getIntervalTimeInMilliseconds(), listener.getIntervalTimeInMilliseconds(), TimeUnit.MILLISECONDS);
         return new TimerReference(listener, f);
     }
 
+    /**
+     * Hystrix 定时任务引用
+     */
     private static class TimerReference extends SoftReference<TimerListener> {
 
         private final ScheduledFuture<?> f;
@@ -117,10 +124,11 @@ public class HystrixTimer {
         }
 
         @Override
+        // 取消定时任务的执行
         public void clear() {
             super.clear();
             // stop this ScheduledFuture from any further executions
-            f.cancel(false);
+            f.cancel(false); // 非强制
         }
 
     }
@@ -140,8 +148,19 @@ public class HystrixTimer {
         }
     }
 
+    /**
+     * 定时任务执行器
+     */
     /* package */ static class ScheduledExecutor {
+
+        /**
+         * 定时任务线程池执行器
+         */
         /* package */ volatile ScheduledThreadPoolExecutor executor;
+
+        /**
+         * 是否初始化
+         */
         private volatile boolean initialized;
 
         /**
@@ -152,6 +171,7 @@ public class HystrixTimer {
             HystrixPropertiesStrategy propertiesStrategy = HystrixPlugins.getInstance().getPropertiesStrategy();
             int coreSize = propertiesStrategy.getTimerThreadPoolProperties().getCorePoolSize().get();
 
+            // 创建 ThreadFactory
             ThreadFactory threadFactory = null;
             if (!PlatformSpecific.isAppEngineStandardEnvironment()) {
                 threadFactory = new ThreadFactory() {
@@ -169,8 +189,8 @@ public class HystrixTimer {
                 threadFactory = PlatformSpecific.getAppEngineThreadFactory();
             }
 
-            executor = new ScheduledThreadPoolExecutor(coreSize, threadFactory);
-            initialized = true;
+            executor = new ScheduledThreadPoolExecutor(coreSize, threadFactory); // 创建 ScheduledThreadPoolExecutor
+            initialized = true; // 已初始化
         }
 
         public ScheduledThreadPoolExecutor getThreadPool() {
@@ -192,11 +212,15 @@ public class HystrixTimer {
          * This contract is used to keep this implementation single-threaded and simplistic.
          * <p>
          * If you need a ThreadLocal set, you can store the state in the TimerListener, then when tick() is called, set the ThreadLocal to your desired value.
+         *
+         * 时间到达( 超时 )执行的逻辑
          */
         public void tick();
 
         /**
          * How often this TimerListener should 'tick' defined in milliseconds.
+         *
+         * 返回到达( 超时 )时间时长
          */
         public int getIntervalTimeInMilliseconds();
     }

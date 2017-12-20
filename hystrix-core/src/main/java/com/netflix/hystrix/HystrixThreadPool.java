@@ -53,24 +53,24 @@ public interface HystrixThreadPool {
      */
     public ExecutorService getExecutor();
 
-    public Scheduler getScheduler();
+    public Scheduler getScheduler(); // 获得 RxJava Scheduler
 
-    public Scheduler getScheduler(Func0<Boolean> shouldInterruptThread);
+    public Scheduler getScheduler(Func0<Boolean> shouldInterruptThread); // 获得 RxJava Scheduler
 
     /**
      * Mark when a thread begins executing a command.
      */
-    public void markThreadExecution();
+    public void markThreadExecution(); // metrics用
 
     /**
      * Mark when a thread completes executing a command.
      */
-    public void markThreadCompletion();
+    public void markThreadCompletion(); // metrics用
 
     /**
      * Mark when a command gets rejected from the threadpool
      */
-    public void markThreadRejection();
+    public void markThreadRejection(); // metrics用
 
     /**
      * Whether the queue will allow adding an item to it.
@@ -80,7 +80,7 @@ public interface HystrixThreadPool {
      *
      * @return boolean whether there is space on the queue
      */
-    public boolean isQueueSpaceAvailable();
+    public boolean isQueueSpaceAvailable(); // 线程池队列是否有空余
 
     /**
      * @ExcludeFromJavadoc
@@ -90,6 +90,7 @@ public interface HystrixThreadPool {
          * Use the String from HystrixThreadPoolKey.name() instead of the HystrixThreadPoolKey instance as it's just an interface and we can't ensure the object
          * we receive implements hashcode/equals correctly and do not want the default hashcode/equals which would create a new threadpool for every object we get even if the name is the same
          */
+        // Key 为 HystrixThreadPoolKey#name() ，每个 HystrixThreadPoolKey 对应一个 HystrixThreadPool 对象。
         /* package */final static ConcurrentHashMap<String, HystrixThreadPool> threadPools = new ConcurrentHashMap<String, HystrixThreadPool>();
 
         /**
@@ -169,23 +170,32 @@ public interface HystrixThreadPool {
         private final int queueSize;
 
         public HystrixThreadPoolDefault(HystrixThreadPoolKey threadPoolKey, HystrixThreadPoolProperties.Setter propertiesDefaults) {
+
+            // 初始化 HystrixThreadPoolPropertie
             this.properties = HystrixPropertiesFactory.getThreadPoolProperties(threadPoolKey, propertiesDefaults);
+
+            // 获得 HystrixConcurrencyStrategy
             HystrixConcurrencyStrategy concurrencyStrategy = HystrixPlugins.getInstance().getConcurrencyStrategy();
+
+            // 队列大小
             this.queueSize = properties.maxQueueSize().get();
 
+            // metrics
             this.metrics = HystrixThreadPoolMetrics.getInstance(threadPoolKey,
                     concurrencyStrategy.getThreadPool(threadPoolKey, properties),
                     properties);
+
             this.threadPool = this.metrics.getThreadPool();
             this.queue = this.threadPool.getQueue();
 
             /* strategy: HystrixMetricsPublisherThreadPool */
+            // metrics
             HystrixMetricsPublisherFactory.createOrRetrievePublisherForThreadPool(threadPoolKey, this.metrics, this.properties);
         }
 
         @Override
         public ThreadPoolExecutor getExecutor() {
-            touchConfig();
+            touchConfig(); // 动态调整 threadPool 的 coreSize / maximumSize / keepAliveTime 参数
             return threadPool;
         }
 
@@ -264,6 +274,7 @@ public interface HystrixThreadPool {
             if (queueSize <= 0) {
                 // we don't have a queue so we won't look for space but instead
                 // let the thread-pool reject or not
+                // 都返回 true 的原因是，线程池使用 SynchronousQueue 作为队列，不支持新任务排队，任务超过线程池的 maximumPoolSize 时，新任务被拒绝
                 return true;
             } else {
                 return threadPool.getQueue().size() < properties.queueSizeRejectionThreshold().get();

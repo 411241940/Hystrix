@@ -69,6 +69,7 @@ public interface HystrixCircuitBreaker {
      */
     class Factory {
         // String is HystrixCommandKey.name() (we can't use HystrixCommandKey directly as we can't guarantee it implements hashcode/equals correctly)
+        // 基于 HystrixCommandKey 维护了 HystrixCircuitBreaker 单例对象 的映射
         private static ConcurrentHashMap<String, HystrixCircuitBreaker> circuitBreakersByCommand = new ConcurrentHashMap<String, HystrixCircuitBreaker>();
 
         /**
@@ -99,10 +100,10 @@ public interface HystrixCircuitBreaker {
             // 2 threads hitting this point at the same time and let ConcurrentHashMap provide us our thread-safety
             // If 2 threads hit here only one will get added and the other will get a non-null response instead.
             HystrixCircuitBreaker cbForCommand = circuitBreakersByCommand.putIfAbsent(key.name(), new HystrixCircuitBreakerImpl(key, group, properties, metrics));
-            if (cbForCommand == null) {
+            if (cbForCommand == null) { // 不存在
                 // this means the putIfAbsent step just created a new one so let's retrieve and return it
                 return circuitBreakersByCommand.get(key.name());
-            } else {
+            } else { // 已经存在
                 // this means a race occurred and while attempting to 'put' another one got there before
                 // and we instead retrieved it and will now return it
                 return cbForCommand;
@@ -143,8 +144,8 @@ public interface HystrixCircuitBreaker {
             CLOSED, OPEN, HALF_OPEN;
         }
 
-        private final AtomicReference<Status> status = new AtomicReference<Status>(Status.CLOSED);
-        private final AtomicLong circuitOpened = new AtomicLong(-1);
+        private final AtomicReference<Status> status = new AtomicReference<Status>(Status.CLOSED); // 断路器状态
+        private final AtomicLong circuitOpened = new AtomicLong(-1); // 断路器打开，即状态变成 OPEN 的时间。
         private final AtomicReference<Subscription> activeSubscription = new AtomicReference<Subscription>(null);
 
         protected HystrixCircuitBreakerImpl(HystrixCommandKey key, HystrixCommandGroupKey commandGroup, final HystrixCommandProperties properties, HystrixCommandMetrics metrics) {
@@ -152,7 +153,7 @@ public interface HystrixCircuitBreaker {
             this.metrics = metrics;
 
             //On a timer, this will set the circuit between OPEN/CLOSED as command executions occur
-            Subscription s = subscribeToStream();
+            Subscription s = subscribeToStream(); // 对请求量统计 Observable 的发起订阅。 返回Subscription，为了方便 unsubscribe() 取消订阅
             activeSubscription.set(s);
         }
 
@@ -160,6 +161,7 @@ public interface HystrixCircuitBreaker {
             /*
              * This stream will recalculate the OPEN/CLOSED status on every onNext from the health stream
              */
+            // #onNext() 每次调用，重新计算断路器的状态。
             return metrics.getHealthCountsStream()
                     .observe()
                     .subscribe(new Subscriber<HealthCounts>() {
@@ -176,6 +178,7 @@ public interface HystrixCircuitBreaker {
                         @Override
                         public void onNext(HealthCounts hc) {
                             // check if we are past the statisticalWindowVolumeThreshold
+                            // circuitBreakerRequestVolumeThreshold，周期内请求数阈值，默认20
                             if (hc.getTotalRequests() < properties.circuitBreakerRequestVolumeThreshold().get()) {
                                 // we are not past the minimum volume threshold for the stat window,
                                 // so no change to circuit status.
@@ -183,6 +186,7 @@ public interface HystrixCircuitBreaker {
                                 // if it was half-open, we need to wait for a successful command execution
                                 // if it was open, we need to wait for sleep window to elapse
                             } else {
+                                // circuitBreakerErrorThresholdPercentage，熔断器错误率阈值，默认:50%
                                 if (hc.getErrorPercentage() < properties.circuitBreakerErrorThresholdPercentage().get()) {
                                     //we are not past the minimum error threshold for the stat window,
                                     // so no change to circuit status.
@@ -191,8 +195,9 @@ public interface HystrixCircuitBreaker {
                                     // if it was open, we need to wait for sleep window to elapse
                                 } else {
                                     // our failure rate is too high, we need to set the state to OPEN
+                                    // 满足条件，打开断路器
                                     if (status.compareAndSet(Status.CLOSED, Status.OPEN)) {
-                                        circuitOpened.set(System.currentTimeMillis());
+                                        circuitOpened.set(System.currentTimeMillis()); // 设置打开时间
                                     }
                                 }
                             }
@@ -201,25 +206,35 @@ public interface HystrixCircuitBreaker {
         }
 
         @Override
+        // 尝试调用正常逻辑成功
         public void markSuccess() {
+            // 修改断路器状态( HALF_OPEN => CLOSED )
             if (status.compareAndSet(Status.HALF_OPEN, Status.CLOSED)) {
                 //This thread wins the race to close the circuit - it resets the stream to start it over from 0
-                metrics.resetStream();
+                metrics.resetStream(); // 清空 Metrics 对请求量统计 Observable 的统计信息
+
+                // 取消原有订阅
                 Subscription previousSubscription = activeSubscription.get();
                 if (previousSubscription != null) {
                     previousSubscription.unsubscribe();
                 }
+
+                // 发起新的订阅
                 Subscription newSubscription = subscribeToStream();
                 activeSubscription.set(newSubscription);
+
+                // 设置断路器打开时间为-1，未打开
                 circuitOpened.set(-1L);
             }
         }
 
         @Override
+        // 尝试调用正常逻辑失败
         public void markNonSuccess() {
+            // HALF_OPEN => OPEN
             if (status.compareAndSet(Status.HALF_OPEN, Status.OPEN)) {
                 //This thread wins the race to re-open the circuit - it resets the start time for the sleep window
-                circuitOpened.set(System.currentTimeMillis());
+                circuitOpened.set(System.currentTimeMillis()); // 重置断路器打开时间为当前时间：半开尝试时间初值
             }
         }
 
@@ -262,20 +277,27 @@ public interface HystrixCircuitBreaker {
 
         @Override
         public boolean attemptExecution() {
+            // 强制打开
             if (properties.circuitBreakerForceOpen().get()) {
                 return false;
             }
+
+            // 强制关闭
             if (properties.circuitBreakerForceClosed().get()) {
                 return true;
             }
+
+            // 断路器打开的时间，-1未打开
             if (circuitOpened.get() == -1) {
                 return true;
             } else {
+                // 是否满足间隔尝试断路器半开时间
                 if (isAfterSleepWindow()) {
                     //only the first request after sleep window should execute
                     //if the executing command succeeds, the status will transition to CLOSED
                     //if the executing command fails, the status will transition to OPEN
                     //if the executing command gets unsubscribed, the status will transition to OPEN
+                    // CAS修改断路器状态( OPEN => HALF_OPEN )
                     if (status.compareAndSet(Status.OPEN, Status.HALF_OPEN)) {
                         return true;
                     } else {

@@ -72,7 +72,7 @@ public class HealthCountsStream extends BucketedRollingCounterStream<HystrixComm
                 HealthCountsStream existingStream = streams.get(commandKey.name());
                 if (existingStream == null) {
                     HealthCountsStream newStream = new HealthCountsStream(commandKey, numBuckets, bucketSizeInMs,
-                            HystrixCommandMetrics.appendEventToBucket);
+                            HystrixCommandMetrics.appendEventToBucket); // appendEventToBucket：滑动窗口里用于将事件聚合成桶的函数实现
 
                     streams.putIfAbsent(commandKey.name(), newStream);
                     healthStream = newStream;
@@ -95,6 +95,12 @@ public class HealthCountsStream extends BucketedRollingCounterStream<HystrixComm
 
     private HealthCountsStream(final HystrixCommandKey commandKey, final int numBuckets, final int bucketSizeInMs,
                                Func2<long[], HystrixCommandCompletion, long[]> reduceCommandCompletion) {
+
+        // Event: HystrixCommandCompletion，代表命令执行完成。可以从中获取执行结果，并从中提取所有产生的事件（HystrixEventType）
+        // Bucket: 桶的类型为 long[]，里面统计了各种事件的个数。数组index为事件类型枚举（HystrixEventType）对应的索引序号（ordinal），值为对应事件的个数
+        // Output: HystrixCommandMetrics.HealthCounts，里面统计了总的执行次数、失败次数以及失败百分比，供熔断器使用
+        // reduceCommandCompletion：将事件聚合成桶的函数
+        // healthCheckAccumulator：将每个窗口聚合成最终的统计数据的函数
         super(HystrixCommandCompletionStream.getInstance(commandKey), numBuckets, bucketSizeInMs, reduceCommandCompletion, healthCheckAccumulator);
     }
 

@@ -36,6 +36,7 @@ public class HystrixCommandCompletionStream implements HystrixEventStream<Hystri
 
     private static final ConcurrentMap<String, HystrixCommandCompletionStream> streams = new ConcurrentHashMap<String, HystrixCommandCompletionStream>();
 
+    // 每个 CommandKey 只有一个实例
     public static HystrixCommandCompletionStream getInstance(HystrixCommandKey commandKey) {
         HystrixCommandCompletionStream initialStream = streams.get(commandKey.name());
         if (initialStream != null) {
@@ -57,6 +58,7 @@ public class HystrixCommandCompletionStream implements HystrixEventStream<Hystri
     HystrixCommandCompletionStream(final HystrixCommandKey commandKey) {
         this.commandKey = commandKey;
 
+        // SerializedSubject:保证调用的顺序
         this.writeOnlySubject = new SerializedSubject<HystrixCommandCompletion, HystrixCommandCompletion>(PublishSubject.<HystrixCommandCompletion>create());
         this.readOnlyStream = writeOnlySubject.share();
     }

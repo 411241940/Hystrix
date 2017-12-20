@@ -21,9 +21,12 @@ public class InternMap<K, V> {
     public V interned(K key) {
         V existingKey = storage.get(key);
         V newKey = null;
+
+        // 判断key对应的value是否存在
         if (existingKey == null) {
+            // 不存在，则通过ValueConstructor实现类的create方法产生新的value,并存入storage中
             newKey = valueConstructor.create(key);
-            existingKey = storage.putIfAbsent(key, newKey);
+            existingKey = storage.putIfAbsent(key, newKey); // 保证方法原子性
         }
         return existingKey != null ? existingKey : newKey;
     }

@@ -64,30 +64,30 @@ public abstract class HystrixCommandProperties {
     private static final Integer default_metricsHealthSnapshotIntervalInMilliseconds = 500; // default to 500ms as max frequency between allowing snapshots of health (error percentage etc)
 
     @SuppressWarnings("unused") private final HystrixCommandKey key;
-    private final HystrixProperty<Integer> circuitBreakerRequestVolumeThreshold; // number of requests that must be made within a statisticalWindow before open/close decisions are made using stats
-    private final HystrixProperty<Integer> circuitBreakerSleepWindowInMilliseconds; // milliseconds after tripping circuit before allowing retry
-    private final HystrixProperty<Boolean> circuitBreakerEnabled; // Whether circuit breaker should be enabled.
-    private final HystrixProperty<Integer> circuitBreakerErrorThresholdPercentage; // % of 'marks' that must be failed to trip the circuit
-    private final HystrixProperty<Boolean> circuitBreakerForceOpen; // a property to allow forcing the circuit open (stopping all requests)
-    private final HystrixProperty<Boolean> circuitBreakerForceClosed; // a property to allow ignoring errors and therefore never trip 'open' (ie. allow all traffic through)
-    private final HystrixProperty<ExecutionIsolationStrategy> executionIsolationStrategy; // Whether a command should be executed in a separate thread or not.
-    private final HystrixProperty<Integer> executionTimeoutInMilliseconds; // Timeout value in milliseconds for a command
-    private final HystrixProperty<Boolean> executionTimeoutEnabled; //Whether timeout should be triggered
+    private final HystrixProperty<Integer> circuitBreakerRequestVolumeThreshold; // 熔断器在整个统计时间内是否开启的阀值，默认20。也就是10秒钟内至少请求20次，熔断器才发挥起作用。number of requests that must be made within a statisticalWindow before open/close decisions are made using stats
+    private final HystrixProperty<Integer> circuitBreakerSleepWindowInMilliseconds; // 熔断器默认工作时间,默认:5秒.熔断器中断请求5秒后会进入半打开状态,放部分流量过去重试。milliseconds after tripping circuit before allowing retry
+    private final HystrixProperty<Boolean> circuitBreakerEnabled; // 是否启用熔断器,默认true。Whether circuit breaker should be enabled.
+    private final HystrixProperty<Integer> circuitBreakerErrorThresholdPercentage; // 熔断器错误阈值，默认:50%。当出错率超过50%后熔断器启动。% of 'marks' that must be failed to trip the circuit
+    private final HystrixProperty<Boolean> circuitBreakerForceOpen; // 熔断器强制开关，如果设置为true则表示强制打开熔断器。a property to allow forcing the circuit open (stopping all requests)
+    private final HystrixProperty<Boolean> circuitBreakerForceClosed; // 与forceOpen正好相反。a property to allow ignoring errors and therefore never trip 'open' (ie. allow all traffic through)
+    private final HystrixProperty<ExecutionIsolationStrategy> executionIsolationStrategy; // 隔离策略 。 Whether a command should be executed in a separate thread or not.
+    private final HystrixProperty<Integer> executionTimeoutInMilliseconds; // 超时时间。 Timeout value in milliseconds for a command
+    private final HystrixProperty<Boolean> executionTimeoutEnabled; // 超时后是否触发fallback方法，默认为true。Whether timeout should be triggered
     private final HystrixProperty<String> executionIsolationThreadPoolKeyOverride; // What thread-pool this command should run in (if running on a separate thread).
-    private final HystrixProperty<Integer> executionIsolationSemaphoreMaxConcurrentRequests; // Number of permits for execution semaphore
-    private final HystrixProperty<Integer> fallbackIsolationSemaphoreMaxConcurrentRequests; // Number of permits for fallback semaphore
-    private final HystrixProperty<Boolean> fallbackEnabled; // Whether fallback should be attempted.
-    private final HystrixProperty<Boolean> executionIsolationThreadInterruptOnTimeout; // Whether an underlying Future/Thread (when runInSeparateThread == true) should be interrupted after a timeout
+    private final HystrixProperty<Integer> executionIsolationSemaphoreMaxConcurrentRequests; // 使用信号量隔离时，命令调用最大的并发数,默认:10。Number of permits for execution semaphore
+    private final HystrixProperty<Integer> fallbackIsolationSemaphoreMaxConcurrentRequests; // 使用信号量隔离时，命令fallback(降级)调用最大的并发数,默认:10。Number of permits for fallback semaphore
+    private final HystrixProperty<Boolean> fallbackEnabled; // 是否开启fallback降级策略 默认true。Whether fallback should be attempted.
+    private final HystrixProperty<Boolean> executionIsolationThreadInterruptOnTimeout; // 使用线程隔离时，是否对命令执行超时的线程调用中断（Thread.interrupt()）操作.默认:true 。Whether an underlying Future/Thread (when runInSeparateThread == true) should be interrupted after a timeout
     private final HystrixProperty<Boolean> executionIsolationThreadInterruptOnFutureCancel; // Whether canceling an underlying Future/Thread (when runInSeparateThread == true) should interrupt the execution thread
-    private final HystrixProperty<Integer> metricsRollingStatisticalWindowInMilliseconds; // milliseconds back that will be tracked
-    private final HystrixProperty<Integer> metricsRollingStatisticalWindowBuckets; // number of buckets in the statisticalWindow
-    private final HystrixProperty<Boolean> metricsRollingPercentileEnabled; // Whether monitoring should be enabled (SLA and Tracers).
+    private final HystrixProperty<Integer> metricsRollingStatisticalWindowInMilliseconds; // // 统计滚动的时间窗口,默认:10000毫秒。milliseconds back that will be tracked
+    private final HystrixProperty<Integer> metricsRollingStatisticalWindowBuckets; // 统计窗口的Buckets的数量,默认:10个,每秒一个Buckets统计。number of buckets in the statisticalWindow
+    private final HystrixProperty<Boolean> metricsRollingPercentileEnabled; // 是否开启监控统计功能,默认:true。Whether monitoring should be enabled (SLA and Tracers).
     private final HystrixProperty<Integer> metricsRollingPercentileWindowInMilliseconds; // number of milliseconds that will be tracked in RollingPercentile
     private final HystrixProperty<Integer> metricsRollingPercentileWindowBuckets; // number of buckets percentileWindow will be divided into
     private final HystrixProperty<Integer> metricsRollingPercentileBucketSize; // how many values will be stored in each percentileWindowBucket
     private final HystrixProperty<Integer> metricsHealthSnapshotIntervalInMilliseconds; // time between health snapshots
-    private final HystrixProperty<Boolean> requestLogEnabled; // whether command request logging is enabled.
-    private final HystrixProperty<Boolean> requestCacheEnabled; // Whether request caching is enabled.
+    private final HystrixProperty<Boolean> requestLogEnabled; // 是否开启请求日志,默认:true。whether command request logging is enabled.
+    private final HystrixProperty<Boolean> requestCacheEnabled; // 是否开启请求缓存,默认:true。Whether request caching is enabled.
 
     /**
      * Isolation strategy to use when executing a {@link HystrixCommand}.

@@ -55,11 +55,11 @@ import java.util.concurrent.Future;
  * It must be stateless or else it will be non-deterministic because most instances are discarded while some are retained and become the
  * "collapsers" for all the ones that are discarded.
  * 
- * @param <BatchReturnType>
+ * @param <BatchReturnType> 多个命令合并执行返回结果类型
  *            The type returned from the {@link HystrixCommand} that will be invoked on batch executions.
- * @param <ResponseType>
+ * @param <ResponseType> 单个命令执行返回结果类型
  *            The type returned from this command.
- * @param <RequestArgumentType>
+ * @param <RequestArgumentType> 单个命令参数类型
  *            The type of the request argument. If multiple arguments are needed, wrap them in another object or a Tuple.
  */
 public abstract class HystrixCollapser<BatchReturnType, ResponseType, RequestArgumentType> implements HystrixExecutable<ResponseType>, HystrixObservable<ResponseType> {
@@ -382,10 +382,12 @@ public abstract class HystrixCollapser<BatchReturnType, ResponseType, RequestArg
         return Observable.defer(new Func0<Observable<ResponseType>>() {
             @Override
             public Observable<ResponseType> call() {
+                // 缓存开关、缓存KEY
                 final boolean isRequestCacheEnabled = getProperties().requestCacheEnabled().get();
                 final String cacheKey = getCacheKey();
 
                 /* try from cache first */
+                // 优先从缓存中获取
                 if (isRequestCacheEnabled) {
                     HystrixCachedObservable<ResponseType> fromCache = requestCache.get(cacheKey);
                     if (fromCache != null) {
@@ -394,9 +396,14 @@ public abstract class HystrixCollapser<BatchReturnType, ResponseType, RequestArg
                     }
                 }
 
+                // 获得 RequestCollapser
                 RequestCollapser<BatchReturnType, ResponseType, RequestArgumentType> requestCollapser = collapserFactory.getRequestCollapser(collapserInstanceWrapper);
+
+                // 提交 命令请求
+                // 提交单个命令请求到请求队列( RequestQueue )，即命令合并执行整体流程第一步
                 Observable<ResponseType> response = requestCollapser.submitRequest(getRequestArgument());
 
+                // 获得 缓存Observable
                 if (isRequestCacheEnabled && cacheKey != null) {
                     HystrixCachedObservable<ResponseType> toCache = HystrixCachedObservable.from(response);
                     HystrixCachedObservable<ResponseType> fromCache = requestCache.putIfAbsent(cacheKey, toCache);
@@ -407,6 +414,9 @@ public abstract class HystrixCollapser<BatchReturnType, ResponseType, RequestArg
                         return fromCache.toObservable();
                     }
                 }
+
+                // 获得 非缓存Observable
+                // 返回的 Observable ，很可能命令实际并未执行，或者说并未执行完成，此时在 #queue() / #execute() 方法，通过 BlockingObservable 阻塞等待执行完成
                 return response;
             }
         });

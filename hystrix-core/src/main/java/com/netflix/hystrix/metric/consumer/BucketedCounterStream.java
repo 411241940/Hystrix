@@ -51,7 +51,7 @@ public abstract class BucketedCounterStream<Event extends HystrixEvent, Bucket, 
         this.reduceBucketToSummary = new Func1<Observable<Event>, Observable<Bucket>>() {
             @Override
             public Observable<Bucket> call(Observable<Event> eventBucket) {
-                return eventBucket.reduce(getEmptyBucketSummary(), appendRawEventToBucket);
+                return eventBucket.reduce(getEmptyBucketSummary(), appendRawEventToBucket); // 通过 RxJava 的 reduce 操作符进行“归纳”操作，将一串事件归纳成一个桶
             }
         };
 
@@ -65,9 +65,9 @@ public abstract class BucketedCounterStream<Event extends HystrixEvent, Bucket, 
             public Observable<Bucket> call() {
                 return inputEventStream
                         .observe()
-                        .window(bucketSizeInMs, TimeUnit.MILLISECONDS) //bucket it by the counter window so we can emit to the next operator in time chunks, not on every OnNext
-                        .flatMap(reduceBucketToSummary)                //for a given bucket, turn it into a long array containing counts of event types
-                        .startWith(emptyEventCountsToStart);           //start it with empty arrays to make consumer logic as generic as possible (windows are always full)
+                        .window(bucketSizeInMs, TimeUnit.MILLISECONDS) // 按单元窗口长度来将某个时间段内的调用事件聚集起来，bucket it by the counter window so we can emit to the next operator in time chunks, not on every OnNext
+                        .flatMap(reduceBucketToSummary)                // 将每个单元窗口内聚集起来的事件集合聚合成桶，for a given bucket, turn it into a long array containing counts of event types
+                        .startWith(emptyEventCountsToStart);           // 为了保证窗口的完整性，开始的时候先产生一串空的桶，start it with empty arrays to make consumer logic as generic as possible (windows are always full)
             }
         });
     }

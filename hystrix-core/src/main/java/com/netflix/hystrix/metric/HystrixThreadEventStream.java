@@ -140,6 +140,7 @@ public class HystrixThreadEventStream {
         writeOnlyCommandStartSubject.onNext(event);
     }
 
+    // 执行完毕/异常/超时都会调用此方法
     public void executionDone(ExecutionResult executionResult, HystrixCommandKey commandKey, HystrixThreadPoolKey threadPoolKey) {
         HystrixCommandCompletion event = HystrixCommandCompletion.from(executionResult, commandKey, threadPoolKey);
         writeOnlyCommandCompletionSubject.onNext(event);

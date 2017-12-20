@@ -27,14 +27,22 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * Refinement of {@link BucketedCounterStream} which reduces numBuckets at a time.
  *
- * @param <Event> type of raw data that needs to get summarized into a bucket
- * @param <Bucket> type of data contained in each bucket
- * @param <Output> type of data emitted to stream subscribers (often is the same as A but does not have to be)
+ * @param <Event> Hystrix 中的调用事件，如命令开始执行、命令执行完成等。type of raw data that needs to get summarized into a bucket
+ * @param <Bucket> 桶的类型。type of data contained in each bucket
+ * @param <Output> 数据聚合的最终输出类型。。type of data emitted to stream subscribers (often is the same as A but does not have to be)
  */
 public abstract class BucketedRollingCounterStream<Event extends HystrixEvent, Bucket, Output> extends BucketedCounterStream<Event, Bucket, Output> {
     private Observable<Output> sourceStream;
     private final AtomicBoolean isSourceCurrentlySubscribed = new AtomicBoolean(false);
 
+    /**
+     *
+     * @param stream 事件源
+     * @param numBuckets 滑动窗口中桶的个数
+     * @param bucketSizeInMs 单元窗口周期
+     * @param appendRawEventToBucket 将事件流聚合成桶的函数
+     * @param reduceBucket 将桶聚合成输出对象的函数
+     */
     protected BucketedRollingCounterStream(HystrixEventStream<Event> stream, final int numBuckets, int bucketSizeInMs,
                                            final Func2<Bucket, Event, Bucket> appendRawEventToBucket,
                                            final Func2<Output, Bucket, Output> reduceBucket) {
@@ -45,9 +53,9 @@ public abstract class BucketedRollingCounterStream<Event extends HystrixEvent, B
                 return window.scan(getEmptyOutputValue(), reduceBucket).skip(numBuckets);
             }
         };
-        this.sourceStream = bucketedStream      //stream broken up into buckets
-                .window(numBuckets, 1)          //emit overlapping windows of buckets
-                .flatMap(reduceWindowToSummary) //convert a window of bucket-summaries into a single summary
+        this.sourceStream = bucketedStream      // 数据流，每个对象代表单元窗口产生的桶。stream broken up into buckets
+                .window(numBuckets, 1)          // 按照滑动窗口桶的个数进行桶的聚集，第二个参数 skip=1 的意思是按照步长为 1 在数据流中滑动，不断聚集对象。emit overlapping windows of buckets
+                .flatMap(reduceWindowToSummary) // 将一系列的桶聚集成最后的数据对象。convert a window of bucket-summaries into a single summary
                 .doOnSubscribe(new Action0() {
                     @Override
                     public void call() {
@@ -60,8 +68,8 @@ public abstract class BucketedRollingCounterStream<Event extends HystrixEvent, B
                         isSourceCurrentlySubscribed.set(false);
                     }
                 })
-                .share()                        //multiple subscribers should get same data
-                .onBackpressureDrop();          //if there are slow consumers, data should not buffer
+                .share()                        // 不同的订阅者看到的数据是一致的。multiple subscribers should get same data
+                .onBackpressureDrop();          // 流量控制，当消费者消费速度过慢时就丢弃数据，不进行积压。if there are slow consumers, data should not buffer
     }
 
     @Override
